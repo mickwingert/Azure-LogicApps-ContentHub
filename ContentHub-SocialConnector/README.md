@@ -13,7 +13,7 @@
 3. Click **Code View** and copy/paste the code from logicapp.json
 4. Switch back to the **Designer** view
 5. Select the entry trigger point, and select **Change connection**
-![Topic Trigger](/docs/images/TopicTrigger.PNG)
+![Topic Trigger](https://raw.githubusercontent.com/mickwingert/Azure-LogicApps-ContentHub/master/ContentHub-SocialConnector/docs/images/TopicTrigger.PNG?token=AAYSZQW4MOUNTDYTZMXHRN26PA7HA)
 6. Select **Add new** and select your previously created Service Bus
 7. Select the Buffer action at the bottom of the LogicApps template
 8. Select **Change connection**
