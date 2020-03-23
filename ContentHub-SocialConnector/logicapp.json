@@ -1,0 +1,299 @@
+{
+  "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "actions": {
+          "Check_if_type_of_post_is_Social_media_": {
+              "actions": {
+                  "Convert_incoming_HTML_message_to_plain_text": {
+                      "description": "Social platforms don't accept HTML",
+                      "inputs": {
+                          "body": "<p>@{body('Get_full_entity_object_from_Content_Hub_API')?['properties']?['SocialMediaMessage_Body']}<br>\n@{body('Get_full_entity_object_from_Content_Hub_API')?['properties']?['SocialMediaMessage_Footer']}</p>",
+                          "host": {
+                              "connection": {
+                                  "name": "@parameters('$connections')['conversionservice']['connectionId']"
+                              }
+                          },
+                          "method": "post",
+                          "path": "/html2text"
+                      },
+                      "runAfter": {},
+                      "type": "ApiConnection"
+                  },
+                  "Create_an_update": {
+                      "inputs": {
+                          "host": {
+                              "connection": {
+                                  "name": "@parameters('$connections')['buffer_1']['connectionId']"
+                              }
+                          },
+                          "method": "post",
+                          "path": "/1/updates/create.json",
+                          "queries": {
+                              "CreateUpdateProfileId": "5d9aadb4ae864c50ac629332",
+                              "CreateUpdateText": "@body('Convert_incoming_HTML_message_to_plain_text')"
+                          }
+                      },
+                      "runAfter": {
+                          "Convert_incoming_HTML_message_to_plain_text": [
+                              "Succeeded"
+                          ]
+                      },
+                      "type": "ApiConnection"
+                  }
+              },
+              "expression": {
+                  "and": [
+                      {
+                          "contains": [
+                              "@variables('contentType')",
+                              "Social media"
+                          ]
+                      }
+                  ]
+              },
+              "runAfter": {
+                  "Set_variable": [
+                      "Succeeded"
+                  ]
+              },
+              "type": "If"
+          },
+          "Convert_trigger_content_body_to_JSON_string": {
+              "description": "Incoming request is base64, need to convert to string",
+              "inputs": "@base64ToString(triggerBody()?['ContentData'])",
+              "runAfter": {
+                  "Initialize_ContentType_variable": [
+                      "Succeeded"
+                  ]
+              },
+              "type": "Compose"
+          },
+          "Get_full_entity_object_from_Content_Hub_API": {
+              "description": "Message Bus only stores metadata and TargetID of ContentHub entity",
+              "inputs": {
+                  "headers": {
+                      "X-Auth-Token": "@variables('authToken')"
+                  },
+                  "method": "GET",
+                  "uri": "https://@{variables('hostUrl')}/api/entities/@{body('Parse_JSON_string_to_usable_output_object')?['saveEntityMessage']?['TargetId']}"
+              },
+              "runAfter": {
+                  "Parse_JSON_string_to_usable_output_object": [
+                      "Succeeded"
+                  ]
+              },
+              "type": "Http"
+          },
+          "Init_ContentHub_host_url_variable_for_API_callbacks": {
+              "description": "hostUrl header value set from CH action request to use with multiple CH instances",
+              "inputs": {
+                  "variables": [
+                      {
+                          "name": "hostUrl",
+                          "type": "string",
+                          "value": "@{triggerBody()['Properties']['hostUrl']}"
+                      }
+                  ]
+              },
+              "runAfter": {},
+              "type": "InitializeVariable"
+          },
+          "Init_X-Auth-Token_variable_to_call_Content_Hub_API": {
+              "description": "Content Hub API calls need a valid auth token",
+              "inputs": {
+                  "variables": [
+                      {
+                          "name": "authToken",
+                          "type": "string",
+                          "value": "@{triggerBody()['Properties']['authToken']}"
+                      }
+                  ]
+              },
+              "runAfter": {
+                  "Init_ContentHub_host_url_variable_for_API_callbacks": [
+                      "Succeeded"
+                  ]
+              },
+              "type": "InitializeVariable"
+          },
+          "Initialize_ContentType_variable": {
+              "inputs": {
+                  "variables": [
+                      {
+                          "name": "contentType",
+                          "type": "string"
+                      }
+                  ]
+              },
+              "runAfter": {
+                  "Init_X-Auth-Token_variable_to_call_Content_Hub_API": [
+                      "Succeeded"
+                  ]
+              },
+              "type": "InitializeVariable"
+          },
+          "Parse_JSON_string_to_usable_output_object": {
+              "description": "Schema is from a test run of trigger action from CH",
+              "inputs": {
+                  "content": "@outputs('Convert_trigger_content_body_to_JSON_string')",
+                  "schema": {
+                      "properties": {
+                          "context": {
+                              "properties": {},
+                              "type": "object"
+                          },
+                          "saveEntityMessage": {
+                              "properties": {
+                                  "ChangeSet": {
+                                      "properties": {
+                                          "Cultures": {
+                                              "items": {
+                                                  "type": "string"
+                                              },
+                                              "type": "array"
+                                          },
+                                          "PropertyChanges": {
+                                              "type": "array"
+                                          },
+                                          "RelationChanges": {
+                                              "items": {
+                                                  "properties": {
+                                                      "Cardinality": {
+                                                          "type": "integer"
+                                                      },
+                                                      "NewValues": {
+                                                          "items": {
+                                                              "type": "integer"
+                                                          },
+                                                          "type": "array"
+                                                      },
+                                                      "Relation": {
+                                                          "type": "string"
+                                                      },
+                                                      "RemovedValues": {
+                                                          "items": {
+                                                              "type": "integer"
+                                                          },
+                                                          "type": "array"
+                                                      },
+                                                      "Role": {
+                                                          "type": "integer"
+                                                      }
+                                                  },
+                                                  "required": [
+                                                      "Relation",
+                                                      "Role",
+                                                      "Cardinality",
+                                                      "NewValues",
+                                                      "RemovedValues"
+                                                  ],
+                                                  "type": "object"
+                                              },
+                                              "type": "array"
+                                          }
+                                      },
+                                      "type": "object"
+                                  },
+                                  "EventType": {
+                                      "type": "string"
+                                  },
+                                  "IsNew": {
+                                      "type": "boolean"
+                                  },
+                                  "TargetDefinition": {
+                                      "type": "string"
+                                  },
+                                  "TargetId": {
+                                      "type": "integer"
+                                  },
+                                  "TargetIdentifier": {
+                                      "type": "string"
+                                  },
+                                  "TimeStamp": {
+                                      "type": "string"
+                                  },
+                                  "UserId": {
+                                      "type": "integer"
+                                  },
+                                  "Version": {
+                                      "type": "integer"
+                                  }
+                              },
+                              "type": "object"
+                          }
+                      },
+                      "type": "object"
+                  }
+              },
+              "runAfter": {
+                  "Convert_trigger_content_body_to_JSON_string": [
+                      "Succeeded"
+                  ]
+              },
+              "type": "ParseJson"
+          },
+          "Set_variable": {
+              "inputs": {
+                  "name": "contentType",
+                  "value": "@{body('Get_full_entity_object_from_Content_Hub_API')?['relations']?['ContentTypeToContent']?['parent']?['properties']?['ContentType.Label']?['en-US']}"
+              },
+              "runAfter": {
+                  "Get_full_entity_object_from_Content_Hub_API": [
+                      "Succeeded"
+                  ]
+              },
+              "type": "SetVariable"
+          }
+      },
+      "contentVersion": "1.0.0.0",
+      "outputs": {},
+      "parameters": {
+          "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+          }
+      },
+      "triggers": {
+          "When_message_is_received_from_Content_Hub_Action_subscription": {
+              "inputs": {
+                  "host": {
+                      "connection": {
+                          "name": "@parameters('$connections')['servicebus']['connectionId']"
+                      }
+                  },
+                  "method": "get",
+                  "path": "/@{encodeURIComponent(encodeURIComponent('m_out'))}/subscriptions/@{encodeURIComponent('m_out')}/messages/head",
+                  "queries": {
+                      "subscriptionType": "Main"
+                  }
+              },
+              "recurrence": {
+                  "frequency": "Second",
+                  "interval": 30
+              },
+              "type": "ApiConnection"
+          }
+      }
+  },
+  "parameters": {
+      "$connections": {
+          "value": {
+              "buffer_1": {
+                  "connectionId": "/subscriptions/567a3fc0-25f2-4940-b134-ebbc4bfa7964/resourceGroups/anz-mel-mw-playground-rg/providers/Microsoft.Web/connections/buffer-1",
+                  "connectionName": "buffer-1",
+                  "id": "/subscriptions/567a3fc0-25f2-4940-b134-ebbc4bfa7964/providers/Microsoft.Web/locations/australiasoutheast/managedApis/buffer"
+              },
+              "conversionservice": {
+                  "connectionId": "/subscriptions/567a3fc0-25f2-4940-b134-ebbc4bfa7964/resourceGroups/anz-mel-mw-playground-rg/providers/Microsoft.Web/connections/conversionservice",
+                  "connectionName": "conversionservice",
+                  "id": "/subscriptions/567a3fc0-25f2-4940-b134-ebbc4bfa7964/providers/Microsoft.Web/locations/australiasoutheast/managedApis/conversionservice"
+              },
+              "servicebus": {
+                  "connectionId": "/subscriptions/567a3fc0-25f2-4940-b134-ebbc4bfa7964/resourceGroups/anz-mel-mw-playground-rg/providers/Microsoft.Web/connections/servicebus",
+                  "connectionName": "servicebus",
+                  "id": "/subscriptions/567a3fc0-25f2-4940-b134-ebbc4bfa7964/providers/Microsoft.Web/locations/australiasoutheast/managedApis/servicebus"
+              }
+          }
+      }
+  }
+}
